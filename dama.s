@@ -114,6 +114,18 @@ LOADBACKGROUNDP2:
     inx
     cpx #$00
     bne LOADBACKGROUNDP2
+LOADBACKGROUNDP3:
+    lda BACKGROUNDDATA+512,x
+    sta $2007
+    inx
+    cpx #$00
+    bne LOADBACKGROUNDP3
+LOADBACKGROUNDP4:
+    lda BACKGROUNDDATA+768,x
+    sta $2007
+    inx
+    cpx #$00
+    bne LOADBACKGROUNDP4
 
     ;load background palettesdata
     lda #$23     ;23c0  
@@ -125,7 +137,7 @@ LOADBACKGROUNDPALETTEDATA:
     lda BACKGROUNDPALETTEDATA, x
     sta $2007
     inx
-    cpx #$20
+    cpx #$40
     bne LOADBACKGROUNDPALETTEDATA
     
 
@@ -157,7 +169,7 @@ NMIHandler:
 	rti
         
 PALETTEDATA:
-    .byte $00, $0F, $00, $10, 	$00, $0A, $15, $01, 	$00, $29, $28, $27, 	$00, $34, $24, $14 	;background palettes
+    	.byte $00, $0F, $00, $10, 	$00, $0A, $15, $01, 	$00, $29, $28, $27, 	$00, $34, $24, $14 	;background palettes
 	.byte $31, $0F, $15, $30, 	$00, $0F, $11, $30, 	$00, $0F, $30, $27, 	$00, $3C, $2C, $1C 	;sprite palettes
 
 SPRITEDATA:
@@ -187,7 +199,10 @@ BACKGROUNDDATA:
 BACKGROUNDPALETTEDATA:	;32 bytes
 	.byte $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55
 	.byte $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55
+	.byte $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55
+        .byte $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55
 
+;
 ;;;;; CPU VECTORS
 
 .segment "VECTORS"
