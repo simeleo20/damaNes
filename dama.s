@@ -1,4 +1,3 @@
-
 ;#define LIBARGS ,
 
 ;
@@ -22,6 +21,24 @@ bpointer: .res 2
 ;bit:       7     6     5     4     3     2     1     0
 ;button:    A     B   select start  up   down  left right
 buttons: .res 1
+
+   ; designate a oam and drawing buffer
+oam	   =	 $0200
+drawingbuf =	 $0300     	; buffer for PPU drawing
+
+; other variables
+soft2000:	.res 2		; buffering $2000 writes PPUCTRL
+soft2001:	.res 2		; buffering $2001 writes PPUMASK
+
+
+
+needdma:	.res 1		; nonzero if NMI should perform sprite DMA
+needdraw:	.res 1		; nonzero if NMI needs to do drawing from the buffer
+needppureg:	.res 1		; nonzero if NMI should update $2000/$2001/$2005
+sleeping:	.res 1		; nonzero if main thread is waiting for VBlank
+
+xscroll:	.res 1		
+yscroll:	.res 1		
 
 ;;;;; START OF CODE
 
@@ -105,15 +122,15 @@ LOADSPRITES:
     STA bpointer+1
 
 LOADBACKGROUND:
-    ; setup address in PPU for nametable data
-    BIT $2002
-    LDA #$20
-    STA $2006
-    LDA #$00
-    STA $2006
+    	; setup address in PPU for nametable data
+    	BIT $2002
+    	LDA #$20
+    	STA $2006
+    	LDA #$00
+    	STA $2006
 
-    ldx #$04;Increment pointer 4 times to write 1024 bytes of data
-    LDY #$00
+    	ldx #$04;Increment pointer 4 times to write 1024 bytes of data
+    	ldy #$00
 LOADBACKGROUNDLOOP:                       ; loop to draw entire nametable
         LDA (bpointer),y
         STA $2007
@@ -160,15 +177,56 @@ INFLOOP:
 ;;;;; INTERRUPT HANDLERS
 
 NMIHandler:
-	lda #$02            ;load sprite range
-    	sta $4014
+	pha         ; back up registers (important)
+     	txa
+     	pha
+     	tya
+     	pha
+
         
         jsr ReadController
         
+
+lda needdma
+	beq :+
+        	lda #0      ; do sprite DMA
+         	sta $2003   ; conditional via the 'needdma' flag
+         	lda #>oam
+         	sta $4014
+
+:	lda needdraw       ; do other PPU drawing (NT/Palette/whathaveyou)
+        	beq :+             ;  conditional via the 'needdraw' flag
+         	bit $2002        ; clear VBl flag, reset $2005/$2006 toggle
+         	;jsr DoDrawing    ; draw the stuff from the drawing buffer
+         	dec needdraw
+
+:	lda needppureg
+	beq :+
+		lda soft2001   ; copy buffered $2000/$2001 (conditional via needppureg)
+        	sta $2001
+        	lda soft2000
+         	sta $2000
+
+         	bit $2002
+         	lda xscroll    ; set X/Y scroll (conditional via needppureg)
+         	sta $2005
+         	lda yscroll
+         	sta $2005
+
+:	;jsr MusicEngine
+
+       		lda #0         ; clear the sleeping flag so that WaitFrame will exit
+       		sta sleeping   ;   note that you should not 'dec' here, as sleeping might
+                ;   already be zero (will be the case during slowdown)
+
         
         
-        
-	rti
+	pla            ; restore regs and exit
+     	tay
+     	pla
+     	tax
+     	pla
+     	rti
         
 ; SUBRUTINE        
 ReadController:
