@@ -19,6 +19,10 @@
 
 bpointer: .res 2
 
+;bit:       7     6     5     4     3     2     1     0
+;button:    A     B   select start  up   down  left right
+buttons: .res 1
+
 ;;;;; START OF CODE
 
 .segment "CODE"
@@ -91,7 +95,7 @@ LOADSPRITES:
     lda SPRITEDATA, x
     sta $0200, x
     inx
-    cpx #$20
+    cpx #$10
     bne LOADSPRITES
 
     ; Initialize world to point to world data
@@ -158,7 +162,35 @@ INFLOOP:
 NMIHandler:
 	lda #$02            ;load sprite range
     	sta $4014
+        
+        jsr ReadController
+        
+        
+        
+        
 	rti
+        
+; SUBRUTINE        
+ReadController:
+
+	lda #$01
+  	sta $4016
+  	lda #$00
+ 	sta $4016
+  	ldx #$08
+
+ReadControllerLoop:
+
+  	lda $4016
+  	lsr a           ; bit0 -> Carry
+  	rol buttons     ; bit0 <- Carry
+  	dex
+  	bne ReadControllerLoop
+  	rts
+
+
+
+        
         
 PALETTEDATA:
 .incbin "palettes.dat"
@@ -172,16 +204,12 @@ SPRITEDATA:
 ;||+------ Priority (0: in front of background; 1: behind background)
 ;|+------- Flip sprite horizontally
 ;+-------- Flip sprite vertically
-	.byte $00, $2, $00, $40
-	.byte $00, $01, $00, $48
-	.byte $48, $10, $00, $40
-	.byte $48, $11, $00, $48
+	.byte $3f, $06, %00100010, $40
+	.byte $3f, $06, %01100010, $48
+	.byte $47, $06, %10100010, $40
+	.byte $47, $06, %11100010, $48
 
-    ;sword
-    .byte $50, $08, %00000001, $80
-    .byte $50, $08, %01000001, $88
-    .byte $58, $18, %00000001, $80
-    .byte $58, $18, %01000001, $88
+
 
 
 
@@ -189,10 +217,14 @@ BACKGROUNDDATA:
 	.include "damaNt.s"
         
 BACKGROUNDPALETTEDATA:	;32 bytes
-	.byte $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
-	.byte $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
-	.byte $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55
-        .byte $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55
+	.byte $55, $55, $55, $55, $55, $55, $55, $55
+        .byte $55, $00, $00, $00, $00, $00, $55, $55
+	.byte $55, $00, $00, $00, $00, $00, $55, $55
+        .byte $55, $00, $00, $00, $00, $00, $55, $55
+	.byte $55, $55, $55, $55, $55, $55, $55, $55
+        .byte $55, $55, $55, $55, $55, $55, $55, $55
+        .byte $55, $55, $55, $55, $55, $55, $55, $55
+        .byte $55, $55, $55, $55, $55, $55, $55, $55
 
 ;
 ;;;;; CPU VECTORS
