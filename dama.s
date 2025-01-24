@@ -16,9 +16,8 @@
 
 .segment "ZEROPAGE"
 
-pointerLo: .res 1
-pointerHi: .res 1
 
+bpointer: .res 2
 
 ;;;;; START OF CODE
 
@@ -95,37 +94,30 @@ LOADSPRITES:
     cpx #$20
     bne LOADSPRITES
 
+    ; Initialize world to point to world data
+    LDA #<BACKGROUNDDATA
+    STA bpointer
+    LDA #>BACKGROUNDDATA
+    STA bpointer+1
+
 LOADBACKGROUND:
-    lda $2002       ;read PPU status to reset high/low latch
-    lda #$20
-    sta $2006
-    lda #$00
-    sta $2006
-    ldx #$00
-LOADBACKGROUNDP1:  
-    lda BACKGROUNDDATA, x
-    sta $2007
-    inx
-    cpx #$00
-    bne LOADBACKGROUNDP1
-LOADBACKGROUNDP2:
-    lda BACKGROUNDDATA+256,x
-    sta $2007
-    inx
-    cpx #$00
-    bne LOADBACKGROUNDP2
-LOADBACKGROUNDP3:
-    lda BACKGROUNDDATA+512,x
-    sta $2007
-    inx
-    cpx #$00
-    bne LOADBACKGROUNDP3
-LOADBACKGROUNDP4:
-    lda BACKGROUNDDATA+768,x
-    sta $2007
-    inx
-    cpx #$00
-    bne LOADBACKGROUNDP4
+    ; setup address in PPU for nametable data
+    BIT $2002
+    LDA #$20
+    STA $2006
+    LDA #$00
+    STA $2006
+
+    ldx #$04;Increment pointer 4 times to write 1024 bytes of data
+    LDY #$00
+LOADBACKGROUNDLOOP:                       ; loop to draw entire nametable
+        LDA (bpointer),y
+        STA $2007
+        INY
+        BNE LOADBACKGROUNDLOOP
+        INC bpointer+1
+        DEX
+        BNE LOADBACKGROUNDLOOP
 
     ;load background palettesdata
     lda #$23     ;23c0  
@@ -169,8 +161,7 @@ NMIHandler:
 	rti
         
 PALETTEDATA:
-    	.byte $00, $0F, $00, $10, 	$00, $0A, $15, $01, 	$00, $29, $28, $27, 	$00, $34, $24, $14 	;background palettes
-	.byte $31, $0F, $15, $30, 	$00, $0F, $11, $30, 	$00, $0F, $30, $27, 	$00, $3C, $2C, $1C 	;sprite palettes
+.incbin "palettes.dat"
 
 SPRITEDATA:
 ;Y, SPRITE NUM, attributes, X
@@ -181,8 +172,8 @@ SPRITEDATA:
 ;||+------ Priority (0: in front of background; 1: behind background)
 ;|+------- Flip sprite horizontally
 ;+-------- Flip sprite vertically
-	.byte $40, $2, $00, $40
-	.byte $40, $01, $00, $48
+	.byte $00, $2, $00, $40
+	.byte $00, $01, $00, $48
 	.byte $48, $10, $00, $40
 	.byte $48, $11, $00, $48
 
@@ -193,12 +184,13 @@ SPRITEDATA:
     .byte $58, $18, %01000001, $88
 
 
+
 BACKGROUNDDATA:
 	.include "damaNt.s"
         
 BACKGROUNDPALETTEDATA:	;32 bytes
-	.byte $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55
-	.byte $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55
+	.byte $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
+	.byte $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
 	.byte $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55
         .byte $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55, $55
 
