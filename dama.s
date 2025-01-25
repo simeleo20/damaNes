@@ -20,11 +20,33 @@ bpointer: .res 2
 
 ;bit:       7     6     5     4     3     2     1     0
 ;button:    A     B   select start  up   down  left right
-buttons: .res 1
+buttons1: .res 1
+
+BUTTON_A      = 1 << 7
+BUTTON_B      = 1 << 6
+BUTTON_SELECT = 1 << 5
+BUTTON_START  = 1 << 4
+BUTTON_UP     = 1 << 3
+BUTTON_DOWN   = 1 << 2
+BUTTON_LEFT   = 1 << 1
+BUTTON_RIGHT  = 1 << 0
+
+JOYPAD1 = $4016
+JOYPAD2 = $4017
 
    ; designate a oam and drawing buffer
 oam	   =	 $0200
-drawingbuf =	 $0300     	; buffer for PPU drawing
+;drawingbuf =	 $0300     	; buffer for PPU drawing
+
+defaultStackPointer = $ff
+defaultBufferPointer = $cf
+
+stackPointer: 	.res 1
+bufferPointer: 	.res 1
+
+;buffer data 	[  size ] 1 stack top 
+;	     	[address] 2
+; 		[  data ] ( size ) 
 
 ; other variables
 soft2000:	.res 2		; buffering $2000 writes PPUCTRL
@@ -45,81 +67,84 @@ yscroll:	.res 1
 .segment "CODE"
 RESET:
 	sei                            ;disable interrupts
-    cld                            ;clear decimal mode
+    	cld                            ;clear decimal mode
 
-    ldx #%10000000                ;disable sound IRQ
-    stx $4017
-    ldx #$00
-    stx $4010                    ;disable PCM
+    	ldx #%10000000                ;disable sound IRQ
+    	stx $4017
+    	ldx #$00
+    	stx $4010                    ;disable PCM
 
-    ;initialize the stack register
-    ldx #$FF
-    txs                           ;transfer X to stack pointer
+    	;initialize the stack register
+    	ldx #defaultStackPointer
+        stx stackPointer
+    	txs                           ;transfer X to stack pointer
+	
+        lda #defaultBufferPointer
+        sta bufferPointer
 
+    	;clear PPU registers
+    	ldx #$00
+    	stx $2000
+    	stx $2001
 
-    ;clear PPU registers
-    ldx #$00
-    stx $2000
-    stx $2001
-
-   ;wait for vblank
+   	;wait for vblank
 :
-    bit $2002
-    bpl :-
+    	bit $2002
+    	bpl :-
 
-    ;Clearing 2k memory
-    txa
+    	;Clearing 2k memory
+    	txa
 CLEARMEMORY:            ;$0000-$07FF 
-    sta $0000, x
-    sta $0100, x
-    sta $0300, x
-    sta $0400, x
-    sta $0500, x
-    sta $0600, x
-    sta $0700, x
-    lda #$ff
-    sta $0200, x
-    lda #$00
+        sta $0000, x
+        sta $0100, x
+        sta $0300, x
+        sta $0400, x
+        sta $0500, x
+        sta $0600, x
+        sta $0700, x
+        lda #$ff
+        sta $0200, x
+        lda #$00
 
-    inx
-    cpx #$00
-    bne CLEARMEMORY
+        inx
+        cpx #$00
+        bne CLEARMEMORY
 
-    ;wait for vblank
+        ;wait for vblank
 :
-    bit $2002
-    bpl :-
+        bit $2002
+        bpl :-
 
-    ;setting sprite range
-    lda #$02
-    sta $4014
+        ;setting sprite range
+        lda #$02
+        sta $4014
 
-    lda #$3f
-    sta $2006
-    lda #$00
-    sta $2006
+        lda #$3f
+        sta $2006
+        lda #$00
+        sta $2006
 
-    ldx #$00
+        ldx #$00
 LOADPALETTES:
-    lda PALETTEDATA, x
-    sta $2007
-    inx
-    cpx #$20
-    bne LOADPALETTES
+        lda PALETTEDATA, x
+        sta $2007
+        inx
+        cpx #$20
+        bne LOADPALETTES
 
-    ldx #$00
+        ldx #$00
 LOADSPRITES:
-    lda SPRITEDATA, x
-    sta $0200, x
-    inx
-    cpx #$10
-    bne LOADSPRITES
+        lda SPRITEDATA, x
+        sta $0200, x
+        inx
+        cpx #$10
+        bne LOADSPRITES
 
-    ; Initialize world to point to world data
-    LDA #<BACKGROUNDDATA
-    STA bpointer
-    LDA #>BACKGROUNDDATA
-    STA bpointer+1
+        ; Initialize world to point to world data
+        LDA #<BACKGROUNDDATA
+        STA bpointer
+        LDA #>BACKGROUNDDATA
+        STA bpointer+1
 
 LOADBACKGROUND:
     	; setup address in PPU for nametable data
@@ -141,23 +166,23 @@ LOADBACKGROUNDLOOP:                       ; loop to draw entire nametable
         BNE LOADBACKGROUNDLOOP
 
     ;load background palettesdata
-    lda #$23     ;23c0  
-    sta $2006
-    lda #$c0
-    sta $2006
-    ldx #$00
+        lda #$23     ;23c0  
+        sta $2006
+        lda #$c0
+        sta $2006
+        ldx #$00
 LOADBACKGROUNDPALETTEDATA:
-    lda BACKGROUNDPALETTEDATA, x
-    sta $2007
-    inx
-    cpx #$40
-    bne LOADBACKGROUNDPALETTEDATA
-    
+        lda BACKGROUNDPALETTEDATA, x
+        sta $2007
+        inx
+        cpx #$40
+        bne LOADBACKGROUNDPALETTEDATA
 
-    ;Reset scroll
-    lda #$00
-    sta $2005
-    sta $2005
+
+        ;Reset scroll
+        lda #$00
+        sta $2005
+        sta $2005
 
 
 ;enable interrupts
@@ -170,11 +195,41 @@ LOADBACKGROUNDPALETTEDATA:
     sta $2001
 
 
+        
+PROVABUFFER:
+	;	save stack pointer and swapping to buffer pointer
+	tsx
+        stx stackPointer
+	ldx #defaultBufferPointer
+        txs
+        
+	lda #$06
+        pha
+        pha
+        lda #<$2084
+        pha
+        lda #>$2084
+        pha
+        lda #$02
+        pha
+        lda #$01
+        sta needdraw
+        
+;	rswap to stack pointer
+	tsx
+        stx bufferPointer
+	ldx stackPointer
+        txs
+        
+;-----------------loop----------------------
 
 INFLOOP:
-	jmp INFLOOP	; endless loop
+        ;jsr readController    
 
-;;;;; INTERRUPT HANDLERS
+	jmp INFLOOP	; endless loop
+;-----------------------------------------
+
+;--------------INTERRUPT HANDLERS-----------
 
 NMIHandler:
 	pha         ; back up registers (important)
@@ -184,10 +239,9 @@ NMIHandler:
      	pha
 
         
-        jsr ReadController
         
 
-lda needdma
+	lda needdma
 	beq :+
         	lda #0      ; do sprite DMA
          	sta $2003   ; conditional via the 'needdma' flag
@@ -197,7 +251,7 @@ lda needdma
 :	lda needdraw       ; do other PPU drawing (NT/Palette/whathaveyou)
         	beq :+             ;  conditional via the 'needdraw' flag
          	bit $2002        ; clear VBl flag, reset $2005/$2006 toggle
-         	;jsr DoDrawing    ; draw the stuff from the drawing buffer
+         	jsr doDrawing    ; draw the stuff from the drawing buffer
          	dec needdraw
 
 :	lda needppureg
@@ -228,8 +282,11 @@ lda needdma
      	pla
      	rti
         
-; SUBRUTINE        
-ReadController:
+        
+        
+; ----------------SUBRUTINE-----------------
+
+readController:
 
 	lda #$01
   	sta $4016
@@ -240,12 +297,57 @@ ReadController:
 ReadControllerLoop:
 
   	lda $4016
-  	lsr a           ; bit0 -> Carry
-  	rol buttons     ; bit0 <- Carry
+  	lsr a               ; bit0 -> Carry
+  	rol buttons1     ; bit0 <- Carry
   	dex
   	bne ReadControllerLoop
   	rts
 
+
+doDrawing:
+;	save stack pointer and swapping to buffer pointer
+	tsx
+        stx stackPointer
+	ldx bufferPointer
+        txs
+
+READBUFFER:
+	; setup address in PPU for nametable data
+        pla
+        beq ENDREADB
+        tax
+        
+    	bit $2002
+    	pla
+    	sta $2006
+    	pla
+    	sta $2006
+	
+READDATA:
+        pla
+        sta $2007
+        dex
+        bne READDATA
+        jmp READBUFFER
+        
+ENDREADB:
+
+;	reswap to stack pointer
+	tsx
+        stx bufferPointer
+	ldx stackPointer
+        txs
+
+	rts
+   ;--------------------------------------
+   ; WaitFrame - waits for VBlank, returns after NMI handler is done
+
+waitFrame:
+     inc sleeping
+     @loop:
+       lda sleeping
+       bne @loop
+     rts
 
 
         
