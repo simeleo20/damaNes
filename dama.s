@@ -60,7 +60,11 @@ needppureg:	.res 1		; nonzero if NMI should update $2000/$2001/$2005
 sleeping:	.res 1		; nonzero if main thread is waiting for VBlank
 
 xscroll:	.res 1		
-yscroll:	.res 1		
+yscroll:	.res 1	
+
+gameState:	.res 1
+
+MOVING_STATE = $01
 
 ;;;;; START OF CODE
 
@@ -145,6 +149,8 @@ LOADSPRITES:
         STA bpointer
         LDA #>BACKGROUNDDATA
         STA bpointer+1
+	lda #$01
+        sta needdma
 
 LOADBACKGROUND:
     	; setup address in PPU for nametable data
@@ -186,13 +192,14 @@ LOADBACKGROUNDPALETTEDATA:
 
 
 ;enable interrupts
-    cli
+        cli
 
-    lda #%10010000
-    sta $2000               ;when vblank occurs call NMI and use second sprite sheet for background
-
-    lda #%00011110          ;show background and sprites
-    sta $2001
+        lda #%10010000
+        sta $2000               ;when vblank occurs call NMI and use second sprite sheet for background
+	sta soft2000
+        lda #%00011110          ;show background and sprites
+        sta $2001
+    	sta soft2001
 
 
         
@@ -205,6 +212,7 @@ PROVABUFFER:
         
 	lda #$06
         pha
+        lda #$08
         pha
         lda #<$2084
         pha
@@ -214,6 +222,7 @@ PROVABUFFER:
         pha
         lda #$01
         sta needdraw
+        sta needppureg
         
 ;	rswap to stack pointer
 	tsx
@@ -224,8 +233,11 @@ PROVABUFFER:
 ;-----------------loop----------------------
 
 INFLOOP:
-        ;jsr readController    
-
+        jsr readController    
+	
+MOVINGSTATE:
+        
+        
 	jmp INFLOOP	; endless loop
 ;-----------------------------------------
 
