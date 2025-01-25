@@ -20,7 +20,8 @@ bpointer: .res 2
 
 ;bit:       7     6     5     4     3     2     1     0
 ;button:    A     B   select start  up   down  left right
-buttons1: .res 1
+buttons1: 	.res 1
+lastButtons1:	.res 1
 
 BUTTON_A      = 1 << 7
 BUTTON_B      = 1 << 6
@@ -65,6 +66,7 @@ yscroll:	.res 1
 gameState:	.res 1
 
 MOVING_STATE = $01
+SELECT_STATE = $02
 
 ;;;;; START OF CODE
 
@@ -230,15 +232,47 @@ PROVABUFFER:
 	ldx stackPointer
         txs
         
+SETUP:
+	lda #MOVING_STATE
+	sta gameState
+        
 ;-----------------loop----------------------
 
 INFLOOP:
+	lda buttons1
+        sta lastButtons1
         jsr readController    
 	
+        lda gameState
+        cmp #MOVING_STATE
+        beq MOVINGSTATE
+        cmp SELECT_STATE
+        beq SELECTSTATE
+        jmp INFLOOP
+        
 MOVINGSTATE:
+        lda buttons1
+        and #BUTTON_DOWN
+        beq :+
+        
+        inc $0200
         
         
-	jmp INFLOOP	; endless loop
+        
+        :
+        
+
+        
+SELECTSTATE:
+
+
+
+
+SENDSPRITEDATA:
+
+
+jmp INFLOOP	; endless loop
+
 ;-----------------------------------------
 
 ;--------------INTERRUPT HANDLERS-----------
