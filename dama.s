@@ -75,6 +75,29 @@ gameState:	.res 1
 MOVING_STATE = $01
 SELECT_STATE = $02
 
+turn:		.res 1
+
+funcX:		.res 1
+funcY:		.res 1
+funcReturn:	.res 1
+
+playerX:	.res 1
+playerY:	.res 1
+
+matrix: 
+.byte $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
+.byte $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
+.byte $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
+.byte $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
+.byte $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
+.byte $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
+.byte $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
+.byte $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
+.byte $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
+.byte $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
+
+
+
 ;;;;; START OF CODE
 
 .segment "CODE"
@@ -198,7 +221,15 @@ LOADBACKGROUNDPALETTEDATA:
         lda #$00
         sta $2005
         sta $2005
-
+        
+        
+	ldx #$00
+LOADMATRIXDATA:
+	lda MATRIXDATA,x
+        sta matrix,x
+	inx
+        cpx #$64
+        bne LOADMATRIXDATA
 
 ;enable interrupts
         cli
@@ -209,8 +240,10 @@ LOADBACKGROUNDPALETTEDATA:
         lda #%00011110          ;show background and sprites
         sta $2001
     	sta soft2001
+        
 
-
+	
+        
         
 PROVABUFFER:
 	;	save stack pointer and swapping to buffer pointer
@@ -243,6 +276,22 @@ SETUP:
 	lda #MOVING_STATE
 	sta gameState
         
+        lda #$02
+        sta playerX
+        sta playerY
+        
+        lda #$01
+        sta funcX
+        lda #$07
+        sta funcY
+        jsr mGet
+        
+        lda #%00010000
+        sta funcX
+        lda #$01
+        sta funcY
+        jsr mPut
+        
 ;-----------------loop----------------------
 
 INFLOOP:
@@ -258,38 +307,51 @@ INFLOOP:
         jmp INFLOOP
         
 MOVINGSTATE:
-        lda pressedButtons1
-        and #BUTTON_DOWN
-        beq :+ 
-          lda spLU
-          clc
-          adc #$10
-          sta spLU
-          sta spRU
-          clc
-          adc #$08
-          sta spLD
-          sta spRD
-          
-          
-        :
-        lda pressedButtons1
-        and #BUTTON_UP
-        beq :+ 
-          lda spLU
-          sec
-          sbc #$10
-          sta spLU
-          sta spRU
-          clc
-          adc #$08
-          sta spLD
-          sta spRD
-          
-          lda pressedButtons1
-        :
-        
 
+	lda playerY ;jump if y=9
+        cmp #$09
+        beq :++
+        
+          	lda pressedButtons1
+          	and #BUTTON_DOWN
+          	beq :+ 
+                  	jsr moveDown
+          	:
+        :
+        lda playerY ;jump if y=0
+        beq :++
+        
+                lda pressedButtons1
+                and #BUTTON_UP
+                beq :+ 
+                        jsr moveUp
+                :
+        :
+        lda playerX ;jump if x=0
+        beq :++
+
+                lda pressedButtons1
+                and #BUTTON_LEFT
+                beq :+
+                        jsr moveLeft
+                :
+	:
+	lda playerX ;jump if x=9
+        cmp #$09
+        beq :++
+
+                lda pressedButtons1
+                and #BUTTON_RIGHT
+                beq :+ 
+                        jsr moveRight
+                :
+        :
+	lda pressedButtons1
+        and #BUTTON_A
+        beq :+
+        	lda #SELECT_STATE
+                sta gameState
+        :
         
 SELECTSTATE:
 
@@ -435,9 +497,155 @@ waitFrame:
        bne @loop
      rts
 
+swapPriority:
+	prio	.set $01<<5
+        ;1 << 5 priority
 
+	lda #prio
+        eor spLU + 2
+        sta spLU + 2
+        
+        lda #prio
+        eor spRU + 2
+        sta spRU + 2
+        
+        lda #prio
+        eor spLD + 2
+        sta spLD + 2
+        
+        lda #prio
+        eor spRD + 2
+        sta spRD + 2
+        
+        rts
+moveUp:
+                lda spLU
+                sec
+                sbc #$10
+                sta spLU
+                sta spRU
+                clc
+                adc #$08
+                sta spLD
+                sta spRD
+
+                jsr swapPriority
+                
+                dec playerY
+                
+                rts
+
+moveDown:
+          	lda spLU
+          	clc
+                adc #$10
+                sta spLU
+                sta spRU
+                clc
+                adc #$08
+                sta spLD
+                sta spRD
+		
+                jsr swapPriority
+                
+                inc playerY
+                
+                rts
+                
+moveLeft:
+	  	lda spLU+3
+                sec
+                sbc #$10
+                sta spLU+3
+                sta spLD+3
+                clc
+                adc #$08
+                sta spRU+3
+                sta spRD+3
+
+                jsr swapPriority
+                
+                dec playerX
+                
+                rts
+moveRight:
+          	lda spLU+3
+          	clc
+                adc #$10
+                sta spLU+3
+                sta spLD+3
+                clc
+                adc #$08
+                sta spRU+3
+                sta spRD+3
+
+                jsr swapPriority
+                
+                inc playerX
+                
+                rts
+
+mGet:
+	lda #$00
+        ldx funcY
+        :
+        cpx #$00
+        beq :+
+        	clc
+                adc #$0a
+                dex
+                jmp :-
+        :
+        clc
+        adc funcX
+        tax
+        lda matrix,x
+        sta funcReturn
+        rts
+       
+mPut:   ;x (x (xxxx),y (yyyy)), y (0 dama marrone, 1 dama azzurra, 2 damona marrone, 3 damona azzurra, 4 tile vuota) 
+	tsx
+        stx stackPointer
+	ldx #defaultBufferPointer
+        txs
         
         
+        
+        
+	lda #$06
+        pha
+        lda #$08
+        pha
+        
+        lda #<$2084
+        sta bpointer
+        lda #>$2084
+        sta bpointer+1
+        
+        clc
+        lda #$01
+        adc bpointer
+        sta bpointer
+        
+        
+        lda #<$2084	; +$20 = +0,5y
+        pha
+        lda #>$2084
+        pha
+        lda #$02  	;size
+        pha
+        
+        ;lda #$01
+        ;sta needdraw
+        ;sta needppureg
+        
+;	rswap to stack pointer
+	tsx
+        stx bufferPointer
+	ldx stackPointer
+        txs
+	rts
+
 PALETTEDATA:
 .incbin "palettes.dat"
 
@@ -471,6 +679,18 @@ BACKGROUNDPALETTEDATA:	;32 bytes
         .byte $55, $55, $55, $55, $55, $55, $55, $55
         .byte $55, $55, $55, $55, $55, $55, $55, $55
         .byte $55, $55, $55, $55, $55, $55, $55, $55
+        
+MATRIXDATA:
+        .byte $01, $00, $01, $00, $01, $00, $01, $00, $01, $00
+        .byte $00, $01, $00, $01, $00, $01, $00, $01, $00, $01
+        .byte $01, $00, $01, $00, $01, $00, $01, $00, $01, $00
+        .byte $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
+        .byte $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
+        .byte $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
+        .byte $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
+        .byte $00, $02, $00, $02, $00, $02, $00, $02, $00, $02
+        .byte $02, $00, $02, $00, $02, $00, $02, $00, $02, $00
+        .byte $00, $02, $00, $02, $00, $02, $00, $02, $00, $02
 
 ;
 ;;;;; CPU VECTORS
