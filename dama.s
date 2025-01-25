@@ -20,8 +20,10 @@ bpointer: .res 2
 
 ;bit:       7     6     5     4     3     2     1     0
 ;button:    A     B   select start  up   down  left right
-buttons1: 	.res 1
-lastButtons1:	.res 1
+buttons1: 		.res 1
+lastButtons1:		.res 1
+pressedButtons1:	.res 1
+releasedButtons1:	.res 1
 
 BUTTON_A      = 1 << 7
 BUTTON_B      = 1 << 6
@@ -38,6 +40,11 @@ JOYPAD2 = $4017
    ; designate a oam and drawing buffer
 oam	   =	 $0200
 ;drawingbuf =	 $0300     	; buffer for PPU drawing
+
+spLU	=	$0200
+spRU	= 	$0204
+spLD	= 	$0208
+spRD	=	$020c
 
 defaultStackPointer = $ff
 defaultBufferPointer = $cf
@@ -251,14 +258,35 @@ INFLOOP:
         jmp INFLOOP
         
 MOVINGSTATE:
-        lda buttons1
+        lda pressedButtons1
         and #BUTTON_DOWN
-        beq :+
-        
-        inc $0200
-        
-        
-        
+        beq :+ 
+          lda spLU
+          clc
+          adc #$10
+          sta spLU
+          sta spRU
+          clc
+          adc #$08
+          sta spLD
+          sta spRD
+          
+          
+        :
+        lda pressedButtons1
+        and #BUTTON_UP
+        beq :+ 
+          lda spLU
+          sec
+          sbc #$10
+          sta spLU
+          sta spRU
+          clc
+          adc #$08
+          sta spLD
+          sta spRD
+          
+          lda pressedButtons1
         :
         
 
@@ -347,6 +375,18 @@ ReadControllerLoop:
   	rol buttons1     ; bit0 <- Carry
   	dex
   	bne ReadControllerLoop
+        
+        ;check pressed and released 
+        lda lastButtons1
+        eor #%11111111
+        and buttons1
+        sta pressedButtons1
+        
+        lda buttons1
+        eor #%11111111
+        and lastButtons1
+        sta releasedButtons1
+        
   	rts
 
 
