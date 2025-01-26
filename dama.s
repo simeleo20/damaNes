@@ -79,6 +79,7 @@ turn:		.res 1
 
 funcX:		.res 1
 funcY:		.res 1
+funcAtt:	.res 1
 funcReturn:	.res 1
 
 playerX:	.res 1
@@ -273,6 +274,10 @@ PROVABUFFER:
         txs
         
 SETUP:
+	;!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        ;una volta tolto PROVABUFFER inserire
+        ;default buffer in buffer pointer
+        ;!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 	lda #MOVING_STATE
 	sta gameState
         
@@ -286,13 +291,15 @@ SETUP:
         sta funcY
         jsr mGet
         
-        lda #%00010000
+        lda #$02
         sta funcX
-        lda #$01
+        lda #$09
         sta funcY
+        lda #$01
+        sta funcAtt
         jsr mPut
         
-;-----------------loop----------------------
+;-----------------loop-----------------------------------------------------------
 
 INFLOOP:
 	lda buttons1
@@ -602,38 +609,128 @@ mGet:
         lda matrix,x
         sta funcReturn
         rts
-       
-mPut:   ;x (x (xxxx),y (yyyy)), y (0 dama marrone, 1 dama azzurra, 2 damona marrone, 3 damona azzurra, 4 tile vuota) 
+;       
+mPut:   ;x, y ,att (bit 0 0_dama-1_damona, bit 1 0_marrone-1_azzurra) 
 	tsx
         stx stackPointer
-	ldx #defaultBufferPointer
+	ldx bufferPointer
         txs
         
         
-        
-        
-	lda #$06
-        pha
-        lda #$08
-        pha
+
+        lda #%00000001
+        and funcAtt
+       	beq :+
+		lda #$05   
+                pha
+                lda #$04	
+                pha
+                
+        	jmp @ENDTILEPUSHING
+        :
+                ;tile to add
+                lda #$03   
+                pha
+                lda #$02	;02
+                pha
+         @ENDTILEPUSHING:
         
         lda #<$2084
         sta bpointer
         lda #>$2084
         sta bpointer+1
         
+        
+        ;	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        ;	potenzialmente per velocizzare guardare se y maggiore $20*x=$100
+        ;	eliminare quell'x e aggiungerlo a una variabile come 1 da
+        ;	aggiungere a bpointer + 1
+        ;	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        
+        ;add y to Pointer
+        ldx funcY
         clc
-        lda #$01
+        cpx #$00
+        :
+        beq :+
+        	clc
+                lda #$40	;+$20 = +0,5y
+                adc bpointer
+                sta bpointer
+                lda #$00
+                adc bpointer+1
+                sta bpointer+1
+                dex
+                jmp :-
+        :
+        
+        ;add x to pointer
+        lda funcX 	;shift register to get x
+
+        
+        clc 
         adc bpointer
         sta bpointer
+        lda #$00
+        adc bpointer+1
+        sta bpointer+1
+        
+	lda funcX 	;seconda volta uguale per fare un *2 raffazzonato
+        
+        clc 
+        adc bpointer
+        sta bpointer
+        lda #$00
+        adc bpointer+1
+        sta bpointer+1
         
         
-        lda #<$2084	; +$20 = +0,5y
+        ;dove salvare
+        lda bpointer	; 
         pha
-        lda #>$2084
+        lda bpointer+1
         pha
         lda #$02  	;size
         pha
+        
+        
+        lda #$02 	;size
+        
+	INIZIOSECONDARIGA:
+        
+	lda #%00000001
+        and funcAtt
+       	beq :+
+        	;tile to add under
+                lda #$15
+                pha
+                lda #$14
+                pha
+                jmp @ENDTILEPUSHING
+        :
+	;tile to add under
+	lda #$13
+        pha
+        lda #$12
+        pha
+        @ENDTILEPUSHING:
+        
+        
+        lda #$20
+        adc bpointer 
+        sta bpointer
+        lda #$00
+        adc bpointer+1
+        sta bpointer+1
+        
+	;dove salvare
+        lda bpointer	; 
+        pha
+        lda bpointer+1
+        pha
+        lda #$02  	;size
+        pha
+        
         
         ;lda #$01
         ;sta needdraw
