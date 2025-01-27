@@ -291,11 +291,11 @@ SETUP:
         sta funcY
         jsr mGet
         
-        lda #$02
+        lda #$06
         sta funcX
-        lda #$09
+        lda #$02
         sta funcY
-        lda #$01
+        lda #%00000100
         sta funcAtt
         jsr mPut
         
@@ -610,16 +610,22 @@ mGet:
         sta funcReturn
         rts
 ;       
-mPut:   ;x, y ,att (bit 0 0_dama-1_damona, bit 1 0_marrone-1_azzurra) 
+mPut:   ;x, y ,att (bit 0 0_dama-1_damona, bit 1 0_marrone-1_azzurra, bit 2 1_tile) 
 	tsx
         stx stackPointer
 	ldx bufferPointer
         txs
         
-        
-
-        lda #%00000001
-        and funcAtt
+        lda funcAtt
+        and #%00000100
+        beq :+
+        	lda #$00
+                pha
+                pha
+                jmp @ENDTILEPUSHING
+	:
+        lda funcAtt
+        and #%00000001
        	beq :+
 		lda #$05   
                 pha
@@ -697,8 +703,17 @@ mPut:   ;x, y ,att (bit 0 0_dama-1_damona, bit 1 0_marrone-1_azzurra)
         
 	INIZIOSECONDARIGA:
         
-	lda #%00000001
-        and funcAtt
+        lda funcAtt
+        and #%00000100
+        beq :+
+        	lda #$00
+                pha
+                pha
+                jmp @ENDTILEPUSHING
+	:
+        
+	lda funcAtt
+        and #%00000001
        	beq :+
         	;tile to add under
                 lda #$15
@@ -731,6 +746,7 @@ mPut:   ;x, y ,att (bit 0 0_dama-1_damona, bit 1 0_marrone-1_azzurra)
         pha
         
         
+        
         PUSHATTRIBUTES:
         
         ;calcolo la la posizione da andare a controllare nel mio array matrix
@@ -743,10 +759,14 @@ mPut:   ;x, y ,att (bit 0 0_dama-1_damona, bit 1 0_marrone-1_azzurra)
         tax
         lda #$00
         cpx #$00
+        :
         beq :+			;fino a che non finiscono le y continuo ad aggiungere $0a
         	clc		;per passare alla riga sotto
                 adc #$0a
+                dex
+                jmp :-
         :
+        clc
         adc funcX
         and #%11111110
         
@@ -764,6 +784,17 @@ mPut:   ;x, y ,att (bit 0 0_dama-1_damona, bit 1 0_marrone-1_azzurra)
         	lda #$05
 	@STORE:
 	sta funcReturn
+        
+        ;AGGIORNAMENTO MATRIX
+        
+        lda funcX
+        and #$01
+        bne :+
+        	lda funcAtt			
+        	sta matrix, x
+        :
+        
+        
         txa
         
         CELLAINBASSOADESTRA:
@@ -782,23 +813,92 @@ mPut:   ;x, y ,att (bit 0 0_dama-1_damona, bit 1 0_marrone-1_azzurra)
 	@STORE:
         sta funcReturn
         
+        ;AGGIORNAMENTO MATRIX
+	lda funcX
+        and #$01
+        beq :+
+        	lda funcAtt			
+        	sta matrix, x
+        :
+        
+	lda funcAtt
+        and #%00000100
+       	bne ENDATTPUSHING
+	  
+        
         MODIFICAATTRIBUTEBYTE:		;modifico il byte degli attributi
+        lda funcAtt
+        and #%00000010
+        bne @AZZURRA
+        	;marrone
+		lda #$00
+        	jmp @STORE	
+        @AZZURRA:
+        	lda #$05
+	@STORE:
+        tay
         
+        INSERIMENTOCOLORE:
+        lda #$01
+        and funcX
+        beq @PARI
+	@DISPARI:
+        	lda funcReturn
+        	and #$0f	;teniamo i bit 0 1 2 3 per scrivere nei 4 5 6 7
+                sta funcReturn
+                tya
+                clc
+                asl
+                asl
+                asl
+                asl
+                eor funcReturn
+                jmp @FINE
+        @PARI:
+        	lda funcReturn
+        	and #$f0	;teniamo i bit 4 5 6 7 per scrivere nei 0 1 2 3
+        	sta funcReturn
+                tya
+                eor funcReturn
+        @FINE:
+	 
+        pha			;attributes to stack
         
+        CALC_ATTRIBUTES_ADDRESS:
         
-        lda #$55
+        clc
+        lda funcY
+        lsr  ;+8
+        
+        tax
+        lda #$00
+        :
+        cpx #$00
+	beq :+
+        	clc
+                adc #$08
+                dex
+        	jmp :-
+        :
+        clc
+        sta funcReturn
+        lda funcX
+        lsr 
+        clc
+        adc funcReturn
+        
+        clc
+        adc #$c9
         pha
-        
-        lda #$c9
-        pha
-        lda #$23
+        lda #$00
+        adc #$23
         pha
         
         lda #$01
         pha
         
-        
-
+        ENDATTPUSHING:
+	
         
         ;lda #$01
         ;sta needdraw
@@ -846,16 +946,16 @@ BACKGROUNDPALETTEDATA:	;32 bytes
         .byte $55, $55, $55, $55, $55, $55, $55, $55
         
 MATRIXDATA:
-        .byte $02, $00, $02, $00, $02, $00, $02, $00, $02, $00
-        .byte $00, $02, $00, $02, $00, $02, $00, $02, $00, $02
-        .byte $02, $00, $02, $00, $02, $00, $02, $00, $02, $00
-        .byte $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
-        .byte $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
-        .byte $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
-        .byte $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
-        .byte $00, $03, $00, $03, $00, $03, $00, $03, $00, $03
-        .byte $03, $00, $03, $00, $03, $00, $03, $00, $03, $00
-        .byte $00, $03, $00, $03, $00, $03, $00, $03, $00, $03
+        .byte $00, $04, $00, $04, $00, $04, $00, $04, $00, $04
+        .byte $04, $00, $04, $00, $04, $00, $04, $00, $04, $00
+        .byte $00, $04, $00, $04, $00, $04, $00, $04, $00, $04
+        .byte $04, $04, $04, $04, $04, $04, $04, $04, $04, $04
+        .byte $04, $04, $04, $04, $04, $04, $04, $04, $04, $04
+        .byte $04, $04, $04, $04, $04, $04, $04, $04, $04, $04
+        .byte $04, $04, $04, $04, $04, $04, $04, $04, $04, $04
+        .byte $04, $02, $04, $02, $04, $02, $04, $02, $04, $02
+        .byte $02, $04, $02, $04, $02, $04, $02, $04, $02, $04
+        .byte $04, $02, $04, $02, $04, $02, $04, $02, $04, $02
 
 ;
 ;;;;; CPU VECTORS
