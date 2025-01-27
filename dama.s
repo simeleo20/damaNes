@@ -640,7 +640,6 @@ mPut:   ;x, y ,att (bit 0 0_dama-1_damona, bit 1 0_marrone-1_azzurra)
         lda #>$2084
         sta bpointer+1
         
-        
         ;	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         ;	potenzialmente per velocizzare guardare se y maggiore $20*x=$100
         ;	eliminare quell'x e aggiungerlo a una variabile come 1 da
@@ -734,15 +733,57 @@ mPut:   ;x, y ,att (bit 0 0_dama-1_damona, bit 1 0_marrone-1_azzurra)
         
         PUSHATTRIBUTES:
         
-        lda funcY
+        ;calcolo la la posizione da andare a controllare nel mio array matrix
+        ;per trovare i dati del gruppo di 4 attributi in cui devo cambiare
+        ;in modo da calcolare il byte degli attributi correnti per poterlo modificare
+        ;senza rompere gli attributi già esistenti
+        
+        lda funcY		
+        and #%11111110
         tax
         lda #$00
         cpx #$00
-        beq :+
-        	clc
+        beq :+			;fino a che non finiscono le y continuo ad aggiungere $0a
+        	clc		;per passare alla riga sotto
                 adc #$0a
         :
         adc funcX
+        and #%11111110
+        
+        ;una volta trovata la cella inizio a ricostruire i dati che saranno nella cella 
+        ;ppu
+        
+        tax
+	lda matrix, x
+        and #%00000010
+        bne @AZZURRA
+        	;marrone
+        	lda #$00
+        	jmp @STORE	;!!!!!!!!!!!! ricordarsi di aggiornare matrix!!!!!!!!!!!!!
+        @AZZURRA:
+        	lda #$05
+	@STORE:
+	sta funcReturn
+        txa
+        
+        CELLAINBASSOADESTRA:
+        clc
+        adc #$0b		;passo alla cella in basso a destra
+        tax
+        lda matrix, x
+        and #%00000010
+        bne @AZZURRA
+        	;marrone
+        			;!!!!!!!!!!!! ricordarsi di aggiornare matrix!!!!!!!!!!!!!
+        	jmp @STORE	
+        @AZZURRA:
+        	lda funcReturn
+        	eor #$50
+	@STORE:
+        sta funcReturn
+        
+        MODIFICAATTRIBUTEBYTE:		;modifico il byte degli attributi
+        
         
         
         lda #$55
