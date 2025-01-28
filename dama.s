@@ -3,6 +3,11 @@
 ;
 ; iNES header
 ;
+;|--------------------|
+;|%10 o %11 | azzurro |
+;|--------------------|
+;|%00 o %01 | marrone |
+;|--------------------|
 
 .segment "HEADER"
     .byte "NES"
@@ -174,7 +179,7 @@ LOADSPRITES:
         lda SPRITEDATA, x
         sta $0200, x
         inx
-        cpx #$10
+        cpx #$20
         bne LOADSPRITES
 
         ; Initialize world to point to world data
@@ -246,32 +251,7 @@ LOADMATRIXDATA:
 	
         
         
-PROVABUFFER:
-	;	save stack pointer and swapping to buffer pointer
-	tsx
-        stx stackPointer
-	ldx #defaultBufferPointer
-        txs
-        
-	lda #$06
-        pha
-        lda #$08
-        pha
-        lda #<$2084
-        pha
-        lda #>$2084
-        pha
-        lda #$02
-        pha
-        lda #$01
-        sta needdraw
-        sta needppureg
-        
-;	rswap to stack pointer
-	tsx
-        stx bufferPointer
-	ldx stackPointer
-        txs
+
         
 SETUP:
 	;!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -281,23 +261,17 @@ SETUP:
 	lda #MOVING_STATE
 	sta gameState
         
+        lda #defaultBufferPointer
+        sta bufferPointer
+        
+        lda #$01
+        sta needppureg
+        
         lda #$02
         sta playerX
         sta playerY
         
-        lda #$01
-        sta funcX
-        lda #$07
-        sta funcY
-        jsr mGet
-        
-        lda #$06
-        sta funcX
-        lda #$02
-        sta funcY
-        lda #%00000100
-        sta funcAtt
-        jsr mPut
+
         
 ;-----------------loop-----------------------------------------------------------
 
@@ -355,10 +329,23 @@ MOVINGSTATE:
         :
 	lda pressedButtons1
         and #BUTTON_A
-        beq :+
-        	lda #SELECT_STATE
-                sta gameState
-        :
+        beq @END_BUTTON_A
+        	lda playerX
+                sta funcX
+                lda playerY
+                sta funcY
+                jsr mGet
+                tay
+                and #%00000100			;if empty tile selected skip
+                bne :+
+                	clc
+                	lda funcReturn
+                        cmp turn
+                        bne :+
+                          lda #SELECT_STATE
+                          sta gameState
+               	:
+        @END_BUTTON_A:
         
 SELECTSTATE:
 
@@ -616,6 +603,9 @@ mPut:   ;x, y ,att (bit 0 0_dama-1_damona, bit 1 0_marrone-1_azzurra, bit 2 1_ti
 	ldx bufferPointer
         txs
         
+        lda #$00	;end data
+        pha
+        
         lda funcAtt
         and #%00000100
         beq :+
@@ -805,7 +795,7 @@ mPut:   ;x, y ,att (bit 0 0_dama-1_damona, bit 1 0_marrone-1_azzurra, bit 2 1_ti
         and #%00000010
         bne @AZZURRA
         	;marrone
-        			;!!!!!!!!!!!! ricordarsi di aggiornare matrix!!!!!!!!!!!!!
+        	lda funcReturn	;!!!!!!!!!!!! ricordarsi di aggiornare matrix!!!!!!!!!!!!!
         	jmp @STORE	
         @AZZURRA:
         	lda funcReturn
@@ -898,7 +888,11 @@ mPut:   ;x, y ,att (bit 0 0_dama-1_damona, bit 1 0_marrone-1_azzurra, bit 2 1_ti
         pha
         
         ENDATTPUSHING:
-	
+        
+
+        
+	lda #$01
+        sta needdraw
         
         ;lda #$01
         ;sta needdraw
@@ -927,7 +921,10 @@ SPRITEDATA:
 	.byte $3f, $06, %01100010, $48
 	.byte $47, $06, %10100010, $40
 	.byte $47, $06, %11100010, $48
-
+        .byte $1f, $08, %00100011, $20
+	.byte $1f, $08, %00100011, $28
+        .byte $27, $08, %00100011, $20
+        .byte $27, $08, %00100011, $28
 
 
 
