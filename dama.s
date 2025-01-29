@@ -61,8 +61,8 @@ defaultBufferPointer = $cf
 stackPointer: 	.res 1
 bufferPointer: 	.res 1
 
-;buffer data 	[  size ] 1 stack top 
-;	     	[address] 2
+;buffer data 	[  size ] (1) stack top 
+;	     	[address] (2)
 ; 		[  data ] ( size ) 
 
 ; other variables
