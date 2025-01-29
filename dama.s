@@ -371,10 +371,11 @@ MOVINGSTATE:
                 	clc
                 	lda funcReturn
                         eor turn
-                        bne @END_BUTTON_A	;if wrong color piece
+                        bne @END_BUTTON_A	;if wrong color piece skip
                           	lda #SELECT_STATE
                           	sta gameState
                                 jsr getInFrontData
+                                ;lda inFrontDataL
         @END_BUTTON_A:
         
 SELECTSTATE:
@@ -383,10 +384,7 @@ SELECTSTATE:
 
 
 
-        lda needIndicatorRecalc
-        beq :+
-        	jsr indicatorRecalc
-        :
+        	;jsr indicatorRecalc
 
 
 jmp INFLOOP	; endless loop
@@ -777,6 +775,56 @@ swapTurn:
                 sta yDir
         rts
 
+searchFirstIndicator:
+
+	lda playerX
+        beq @check_rr
+
+	lda playerX
+        cmp #$01
+        beq @check_l
+
+        @check_ll:
+        	lda #$03
+                sta funcX
+        	lda #$02
+                sta funcY
+		lda inFrontDataL
+        	lsr
+        	lsr
+        	lsr
+        	lsr
+                cmp #%00000100
+                bne @check_l	;if empty: check_l_to_eat, else: check_l
+        @check_l_to_eat:
+        	lda inFrontDataL
+                eor turn
+                and #%00000010
+                beq :+			;c'è una pedina avversaria in mezzo
+                
+                
+                :			;c'è una pedina dello stesso colore 
+        
+	@check_l:
+        
+        
+        
+        lda playerX
+        cmp #$09
+        beq @end_check
+        
+        lda playerX
+        cmp #$08
+        beq @check_r
+        @check_rr:
+
+        @check_r:
+        
+        @end_check:
+	
+        ;!!!!!!!!!!!!!trasformare funcX e funcY in posizioni reali!!!!!!!!!!!!!
+        
+	rts
 
 mGet:
 	lda #$00
