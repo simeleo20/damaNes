@@ -50,6 +50,10 @@ spLU	=	$0200
 spRU	= 	$0204
 spLD	= 	$0208
 spRD	=	$020c
+inLU	=	$0210
+inRU	=	$0214
+inLD	= 	$0218
+inRD	=	$021c
 
 defaultStackPointer = $ff
 defaultBufferPointer = $cf
@@ -72,6 +76,9 @@ needdraw:	.res 1		; nonzero if NMI needs to do drawing from the buffer
 needppureg:	.res 1		; nonzero if NMI should update $2000/$2001/$2005
 sleeping:	.res 1		; nonzero if main thread is waiting for VBlank
 
+needIndicatorRecalc: 	.res 1
+
+
 xscroll:	.res 1		
 yscroll:	.res 1	
 
@@ -89,6 +96,14 @@ funcReturn:	.res 1
 
 playerX:	.res 1
 playerY:	.res 1
+
+indicatorX:	.res 1
+indicatorY:	.res 1
+
+inFrontDataL:	.res 1
+inFrontDataR:	.res 1
+
+yDir:		.res 1
 
 matrix: 
 .byte $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
@@ -271,6 +286,15 @@ SETUP:
         sta playerX
         sta playerY
         
+        lda #$00
+        sta indicatorX
+        lda #$01
+        sta indicatorY
+        sta needIndicatorRecalc
+        
+        lda #$01
+        sta yDir
+        
 
         
 ;-----------------loop-----------------------------------------------------------
@@ -280,11 +304,17 @@ INFLOOP:
         sta lastButtons1
         jsr readController    
 	
+        clc
         lda gameState
         cmp #MOVING_STATE
         beq MOVINGSTATE
-        cmp SELECT_STATE
+        clc
+        cmp #SELECT_STATE
         beq SELECTSTATE
+        
+
+        
+        
         jmp INFLOOP
         
 MOVINGSTATE:
@@ -337,22 +367,26 @@ MOVINGSTATE:
                 jsr mGet
                 tay
                 and #%00000100			;if empty tile selected skip
-                bne :+
+                bne @END_BUTTON_A
                 	clc
                 	lda funcReturn
-                        cmp turn
-                        bne :+
-                          lda #SELECT_STATE
-                          sta gameState
-               	:
+                        eor turn
+                        bne @END_BUTTON_A	;if wrong color piece
+                          	lda #SELECT_STATE
+                          	sta gameState
+                                jsr getInFrontData
         @END_BUTTON_A:
         
 SELECTSTATE:
+	
 
 
 
 
-SENDSPRITEDATA:
+        lda needIndicatorRecalc
+        beq :+
+        	jsr indicatorRecalc
+        :
 
 
 jmp INFLOOP	; endless loop
@@ -377,6 +411,7 @@ NMIHandler:
          	sta $2003   ; conditional via the 'needdma' flag
          	lda #>oam
          	sta $4014
+                lda #$00
 
 :	lda needdraw       ; do other PPU drawing (NT/Palette/whathaveyou)
         	beq :+             ;  conditional via the 'needdraw' flag
@@ -399,9 +434,9 @@ NMIHandler:
 
 :	;jsr MusicEngine
 
-       		lda #0         ; clear the sleeping flag so that WaitFrame will exit
-       		sta sleeping   ;   note that you should not 'dec' here, as sleeping might
-                ;   already be zero (will be the case during slowdown)
+        lda #0         ; clear the sleeping flag so that WaitFrame will exit
+        sta sleeping   ;   note that you should not 'dec' here, as sleeping might
+        ;   already be zero (will be the case during slowdown)
 
         
         
@@ -414,7 +449,7 @@ NMIHandler:
         
         
         
-; ----------------SUBRUTINE-----------------
+; ----------------SUBRUTINE-----------------------------------------------------------------
 
 readController:
 
@@ -490,6 +525,9 @@ waitFrame:
        lda sleeping
        bne @loop
      rts
+     
+
+
 
 swapPriority:
 	prio	.set $01<<5
@@ -578,6 +616,167 @@ moveRight:
                 inc playerX
                 
                 rts
+
+indicatorRecalc:
+	ldx indicatorY
+        lda #$1f
+        :
+        cpx #$00
+        beq :+
+        	clc
+        	adc #$10
+                dex
+                jmp :-
+        :
+        sta inLU
+        sta inRU
+        clc
+        adc #$08
+        sta inLD
+        sta inRD
+        ldx indicatorX
+        lda #$20
+        cpx #$00
+        :
+        beq :+
+        	clc
+        	adc #$10
+                dex
+                jmp :-
+        :
+       	
+        sta inLU+3
+        sta inLD+3
+        clc
+        adc #$08
+        sta inRU+3
+        sta inRD+3
+        
+        rts
+
+playerRecalc:
+	ldx playerY
+        lda #$1f
+        :
+        cpx #$00
+        beq :+
+        	clc
+        	adc #$10
+                dex
+                jmp :-
+        :
+        sta spLU
+        sta spRU
+        clc
+        adc #$08
+        sta spLD
+        sta spRD
+        ldx playerX
+        lda #$20
+        cpx #$00
+        :
+        beq :+
+        	clc
+        	adc #$10
+                dex
+                jmp :-
+        :
+       	
+        sta spLU+3
+        sta spLD+3
+        clc
+        adc #$08
+        sta spRU+3
+        sta spRD+3
+        
+        rts
+        
+        
+        		;		  54  32
+        		;		76      10
+        		;		
+getInFrontData:		;inFrontData (15 14 13 12) (11 10 9 8) ( 76 54)( 32 10 ) 
+	lda #$00
+        sta inFrontDataL
+        sta inFrontDataR
+        
+	;calc 54 and 32
+	lda playerY
+        clc
+        adc yDir
+        sta funcY
+        
+        lda playerX	;calculate  32
+        clc
+        adc #$01 	
+        sta funcX
+        jsr mGet
+        lda funcReturn
+        asl
+        asl
+        asl
+        asl
+        ora inFrontDataR
+        sta inFrontDataR
+        
+        lda playerX	;calculate 54
+        sec
+        sbc #$01
+        sta funcX
+        jsr mGet
+        lda funcReturn
+        ora inFrontDataL
+        sta inFrontDataL
+        
+        ;calc 76 and 10
+        lda playerY
+        clc
+        adc yDir
+        clc
+        adc yDir
+        sta funcY
+        
+        lda playerX	;calculate 10
+        clc
+        adc #$02
+        sta funcX
+        jsr mGet
+        lda funcReturn
+        ora inFrontDataR
+        sta inFrontDataR
+        
+	lda playerX	;calculate 76
+        sec
+        sbc #$02
+        sta funcX
+        jsr mGet
+        lda funcReturn
+        asl
+        asl
+        asl
+        asl
+        ora inFrontDataL
+        sta inFrontDataL
+	
+	
+        rts
+        
+swapTurn:
+	lda turn
+        beq @marrone
+        	lda #$00	;from blue to brown
+                sta turn
+                lda #$01
+                sta yDir
+                rts
+        	
+        @marrone:
+            	lda #%00000010	;from brown to blue
+                sta turn
+                lda #$ff
+                sta yDir
+        rts
+
 
 mGet:
 	lda #$00
@@ -921,10 +1120,10 @@ SPRITEDATA:
 	.byte $3f, $06, %01100010, $48
 	.byte $47, $06, %10100010, $40
 	.byte $47, $06, %11100010, $48
-        .byte $1f, $08, %00100011, $20
-	.byte $1f, $08, %00100011, $28
-        .byte $27, $08, %00100011, $20
-        .byte $27, $08, %00100011, $28
+        .byte $ff, $08, %00000011, $20
+	.byte $ff, $08, %00000011, $28
+        .byte $ff, $08, %00000011, $20
+        .byte $ff, $08, %00000011, $28
 
 
 
