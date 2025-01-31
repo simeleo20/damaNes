@@ -379,7 +379,7 @@ MOVINGSTATE:
         @END_BUTTON_A:
         
 SELECTSTATE:
-	
+	jsr searchFirstIndicator
 
 
 
@@ -777,6 +777,7 @@ swapTurn:
 
 searchFirstIndicator:
 
+	clc
 	lda playerX
         beq @check_rr
 
@@ -785,28 +786,43 @@ searchFirstIndicator:
         beq @check_l
 
         @check_ll:
-        	lda #$03
+        	lda #$fe	;-2
                 sta funcX
         	lda #$02
                 sta funcY
 		lda inFrontDataL
-        	lsr
-        	lsr
-        	lsr
-        	lsr
-                cmp #%00000100
-                bne @check_l	;if empty: check_l_to_eat, else: check_l
+        	;lsr
+        	;lsr
+        	;lsr
+        	;lsr
+                ;cmp #%00000100
+                and #%01000000
+                beq @check_l	;if ll empty: check_l_to_eat, else: check_l
+                lda inFrontDataL
+                and #%0
         @check_l_to_eat:
         	lda inFrontDataL
                 eor turn
                 and #%00000010
                 beq :+			;c'è una pedina avversaria in mezzo
-                
-                
+                	lda #$01
+                        sta funcAtt
+                	jmp @end_check
                 :			;c'è una pedina dello stesso colore 
-        
 	@check_l:
-        
+        	lda #$ff	;-1
+                sta funcX
+        	lda #$01
+                sta funcY
+                
+                lda inFrontDataL
+                and #%00000100
+                beq :+			;if empty: jmp end_check else: continue
+                	lda #$01
+                        sta funcAtt
+                	jmp @end_check
+                :
+        	
         
         
         lda playerX
